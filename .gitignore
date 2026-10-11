@@ -1,0 +1,125 @@
+# ====================
+# Spring Boot Project Root .gitignore
+# ====================
+
+# -----------------
+# Build Artifacts
+# -----------------
+target/
+*.jar
+*.war
+*.ear
+
+# Maven wrapper jar (keep config, regenerate jar)
+.mvn/wrapper/maven-wrapper.jar
+
+# Gradle (if used)
+build/
+.gradle/
+gradle-wrapper.jar
+
+# -----------------
+# IDE - IntelliJ IDEA
+# -----------------
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# -----------------
+# IDE - Eclipse / STS
+# -----------------
+.classpath
+.project
+.settings/
+.springBeans
+.apt_generated
+.sts4-cache
+
+# -----------------
+# IDE - NetBeans
+# -----------------
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# -----------------
+# IDE - VS Code
+# -----------------
+.vscode/
+
+# -----------------
+# Sensitive Configuration Files
+# -----------------
+# Local application properties with passwords/secrets
+# Commit application.properties with placeholders, keep local overrides separate
+application-local.properties
+application-dev.properties
+application-docker.properties
+*.secret
+*.keystore
+*.jks
+*.p12
+*.pfx
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# -----------------
+# Logs
+# -----------------
+*.log
+logs/
+*.log.*
+
+# -----------------
+# OS Files
+# -----------------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# -----------------
+# Temporary files
+# -----------------
+tmp/
+temp/
+*.tmp
+
+# -----------------
+# Docker
+# -----------------
+docker-compose.override.yml
+
+# -----------------
+# Coverage
+# -----------------
+coverage/
+*.coverage
+jacoco/
+site/jacoco/
+
+# -----------------
+# Dependency lock files (optional - uncomment if needed)
+# **/pom.xml.next
+
+# -----------------
+# Postman (environment files may contain secrets)
+postman/*.environment.json
+postman/*.environment.yaml
+postman/environments/
+
+# Postman auto-generated copy folders
+postman/collections/* Copy/
+
+# -----------------
+# Junie agent session data (keep guidelines, ignore sessions)
+.junie/sessions/

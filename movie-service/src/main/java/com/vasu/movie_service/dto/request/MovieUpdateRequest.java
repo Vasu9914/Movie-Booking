@@ -33,5 +33,8 @@ public class MovieUpdateRequest {
 
     private LocalDate releaseDate;
 
+    @Size(max = 1000, message = "Poster URL must not exceed 1000 characters")
+    private String posterUrl;
+
     private EntityStatus status;
 }

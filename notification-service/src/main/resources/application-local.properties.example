@@ -1,0 +1,5 @@
+# Local development overrides
+# Copy this file to application-local.properties and fill in your values
+
+spring.datasource.username=root
+spring.datasource.password=YOUR_PASSWORD_HERE

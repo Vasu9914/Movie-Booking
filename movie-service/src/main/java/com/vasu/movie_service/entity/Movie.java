@@ -42,6 +42,9 @@ public class Movie {
     @Column(name = "release_date")
     private java.time.LocalDate releaseDate;
 
+    @Column(name = "poster_url", length = 1000)
+    private String posterUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private EntityStatus status;

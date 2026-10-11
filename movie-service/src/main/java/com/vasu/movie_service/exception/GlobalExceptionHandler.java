@@ -1,17 +1,23 @@
 package com.vasu.movie_service.exception;
 
 import com.vasu.movie_service.dto.common.ErrorResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -70,12 +76,61 @@ public class GlobalExceptionHandler {
                 .build();
     }
 
+    @ExceptionHandler(NoHandlerFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleNoHandlerFoundException(NoHandlerFoundException ex) {
+        return ErrorResponse.builder()
+                .status(HttpStatus.NOT_FOUND.value())
+                .message("The requested endpoint does not exist: " + ex.getHttpMethod() + " " + ex.getRequestURL())
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(AuthenticationCredentialsNotFoundException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleAuthenticationCredentialsNotFoundException(AuthenticationCredentialsNotFoundException ex) {
+        return ErrorResponse.builder()
+                .status(HttpStatus.UNAUTHORIZED.value())
+                .message("Authentication required. Please log in to access this resource.")
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleAccessDeniedException(AccessDeniedException ex) {
+        return ErrorResponse.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .message("Access denied. You do not have permission to perform this action.")
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        log.error("Database integrity violation: {}", ex.getMessage());
+        if (ex.getMessage() != null && ex.getMessage().contains("duplicate")) {
+            return ErrorResponse.builder()
+                    .status(HttpStatus.CONFLICT.value())
+                    .message("Duplicate entry. This resource already exists.")
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        }
+        return ErrorResponse.builder()
+                .status(HttpStatus.CONFLICT.value())
+                .message("Data integrity constraint violated.")
+                .timestamp(LocalDateTime.now())
+                .build();
+    }
+
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handleGenericException(Exception ex) {
+        log.error("Unexpected internal server error: {}", ex.getMessage(), ex);
         return ErrorResponse.builder()
                 .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .message("An unexpected error occurred")
+                .message("An unexpected error occurred. Please try again later.")
                 .timestamp(LocalDateTime.now())
                 .build();
     }

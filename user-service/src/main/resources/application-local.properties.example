@@ -1,0 +1,9 @@
+# Local development overrides
+# Copy this file to application-local.properties and fill in your values
+
+spring.datasource.username=root
+spring.datasource.password=YOUR_PASSWORD_HERE
+
+# JWT
+jwt.secret=YOUR_JWT_SECRET_KEY_HERE_MINIMUM_32_CHARACTERS_LONG
+jwt.expiration=86400000

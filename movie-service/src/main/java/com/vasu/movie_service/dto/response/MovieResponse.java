@@ -21,6 +21,7 @@ public class MovieResponse {
     private String language;
     private Integer durationMinutes;
     private LocalDate releaseDate;
+    private String posterUrl;
     private EntityStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

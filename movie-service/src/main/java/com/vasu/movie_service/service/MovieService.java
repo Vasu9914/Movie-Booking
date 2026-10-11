@@ -2,6 +2,7 @@ package com.vasu.movie_service.service;
 
 import com.vasu.movie_service.dto.request.MovieCreateRequest;
 import com.vasu.movie_service.dto.request.MovieUpdateRequest;
+import com.vasu.movie_service.dto.request.StatusChangeRequest;
 import com.vasu.movie_service.dto.response.MovieResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -17,6 +18,8 @@ public interface MovieService {
     Slice<MovieResponse> searchMovies(String keyword, Pageable pageable);
 
     MovieResponse updateMovie(Long id, MovieUpdateRequest request);
+
+    void updateMovieStatus(Long id, StatusChangeRequest request);
 
     void deleteMovie(Long id);
 }

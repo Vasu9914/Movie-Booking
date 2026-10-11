@@ -1,6 +1,8 @@
 package com.vasu.movie_service.service.impl;
 
 import com.vasu.movie_service.dto.request.ShowCreateRequest;
+import com.vasu.movie_service.dto.request.ShowStatusChangeRequest;
+import com.vasu.movie_service.dto.request.ShowUpdateRequest;
 import com.vasu.movie_service.dto.response.ShowResponse;
 import com.vasu.movie_service.entity.Movie;
 import com.vasu.movie_service.entity.Screen;
@@ -61,7 +63,7 @@ public class ShowServiceImpl implements ShowService {
     @Override
     @Transactional(readOnly = true)
     public ShowResponse getShowById(Long id) {
-        Show show = showRepository.findByIdAndStatus(id, ShowStatus.SCHEDULED)
+        Show show = showRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Show", id));
         return showMapper.toResponse(show);
     }
@@ -78,6 +80,59 @@ public class ShowServiceImpl implements ShowService {
     public Slice<ShowResponse> getShowsByMovieId(Long movieId, Pageable pageable) {
         Slice<Show> shows = showRepository.findByMovieIdAndStatus(movieId, ShowStatus.SCHEDULED, pageable);
         return shows.map(showMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Slice<ShowResponse> getShowsByCity(String city, Pageable pageable) {
+        Slice<Show> shows = showRepository.findByScreenTheatreCityAndStatus(city, ShowStatus.SCHEDULED, pageable);
+        return shows.map(showMapper::toResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Slice<ShowResponse> getShowsByMovieIdAndDate(Long movieId, LocalDateTime dateFrom, Pageable pageable) {
+        Slice<Show> shows = showRepository.findByMovieIdAndStatusAndStartTimeAfter(
+                movieId, ShowStatus.SCHEDULED, dateFrom, pageable);
+        return shows.map(showMapper::toResponse);
+    }
+
+    @Override
+    public ShowResponse updateShow(Long id, ShowUpdateRequest request) {
+        Show show = showRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Show", id));
+
+        Movie movie = movieRepository.findByIdAndStatus(request.getMovieId(), EntityStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("Movie", request.getMovieId()));
+
+        Screen screen = screenRepository.findByIdAndStatus(request.getScreenId(), EntityStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("Screen", request.getScreenId()));
+
+        validateShowTime(request.getStartTime(), request.getEndTime());
+
+        if (show.getStatus() == ShowStatus.SCHEDULED) {
+            List<Show> overlapping = showRepository.findOverlappingShows(
+                    request.getScreenId(), ShowStatus.SCHEDULED, request.getStartTime(), request.getEndTime());
+            if (overlapping.stream().anyMatch(s -> !s.getId().equals(id))) {
+                throw new OverlappingShowException("Screen has overlapping shows at the specified time");
+            }
+        }
+
+        show.setMovie(movie);
+        show.setScreen(screen);
+        show.setStartTime(request.getStartTime());
+        show.setEndTime(request.getEndTime());
+
+        Show updated = showRepository.save(show);
+        return showMapper.toResponse(updated);
+    }
+
+    @Override
+    public void updateShowStatus(Long id, ShowStatusChangeRequest request) {
+        Show show = showRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Show", id));
+        show.setStatus(request.getStatus());
+        showRepository.save(show);
     }
 
     @Override

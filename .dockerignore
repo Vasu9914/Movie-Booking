@@ -1,0 +1,13 @@
+target/
+.idea/
+*.iml
+*.class
+*.log
+.git/
+.gitignore
+*.md
+.DS_Store
+Thumbs.db
+node_modules/
+*.jar
+!.mvn/wrapper/maven-wrapper.jar

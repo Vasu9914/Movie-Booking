@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Checkout</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 480px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            color: #1f2937;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #3395ff;
+            box-shadow: 0 0 0 3px rgba(51, 149, 255, 0.15);
+        }
+
+        .pay-btn {
+            width: 100%;
+            padding: 14px;
+            background: #3395ff;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+
+        .pay-btn:hover {
+            background: #2286ff;
+        }
+
+        .pay-btn:disabled {
+            background: #93c5fd;
+            cursor: not-allowed;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.success {
+            display: block;
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .message.error {
+            display: block;
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 999px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Payment Checkout</h1>
+        <span class="badge">Mock Mode</span>
+        <p class="subtitle">Enter your booking details to complete payment.</p>
+
+        <div class="form-group">
+            <label for="bookingRef">Booking Reference</label>
+            <input type="text" id="bookingRef" placeholder="e.g. BOOK-12345">
+        </div>
+
+        <div class="form-group">
+            <label for="amount">Amount (INR)</label>
+            <input type="number" id="amount" placeholder="e.g. 299.00" min="1" step="0.01">
+        </div>
+
+        <button class="pay-btn" id="payBtn" onclick="processPayment()">Pay Now</button>
+
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        function showMessage(text, type) {
+            const el = document.getElementById('message');
+            el.textContent = text;
+            el.className = 'message ' + type;
+        }
+
+        async function processPayment() {
+            const bookingRef = document.getElementById('bookingRef').value.trim();
+            const amount = document.getElementById('amount').value.trim();
+            const btn = document.getElementById('payBtn');
+
+            if (!bookingRef) {
+                showMessage('Please enter a booking reference.', 'error');
+                return;
+            }
+            if (!amount || parseFloat(amount) <= 0) {
+                showMessage('Please enter a valid amount.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Processing...';
+            document.getElementById('message').className = 'message';
+
+            try {
+                // Step 1: Initiate payment
+                const initiateRes = await fetch(API_BASE + '/api/payments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bookingReference: bookingRef,
+                        amount: parseFloat(amount),
+                        currency: 'INR',
+                        idempotencyKey: 'idemp_' + bookingRef + '_' + Date.now()
+                    })
+                });
+
+                if (!initiateRes.ok) {
+                    const err = await initiateRes.json();
+                    throw new Error(err.message || 'Failed to initiate payment');
+                }
+
+                const initiateData = await initiateRes.json();
+                const paymentReference = initiateData.paymentReference;
+
+                // Step 2: Create order (mock)
+                const orderRes = await fetch(API_BASE + '/api/payments/' + paymentReference + '/orders', {
+                    method: 'POST'
+                });
+
+                if (!orderRes.ok) {
+                    const err = await orderRes.json();
+                    throw new Error(err.message || 'Failed to create order');
+                }
+
+                // Step 3: Verify payment (mock - always succeeds)
+                const verifyRes = await fetch(API_BASE + '/api/payments/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        paymentReference: paymentReference
+                    })
+                });
+
+                const verifyData = await verifyRes.json();
+
+                if (verifyData.success) {
+                    showMessage('Payment successful! Reference: ' + paymentReference, 'success');
+                } else {
+                    showMessage('Payment failed: ' + verifyData.message, 'error');
+                }
+
+            } catch (err) {
+                showMessage(err.message || 'An error occurred during payment.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Pay Now';
+            }
+        }
+    </script>
+</body>
+</html>

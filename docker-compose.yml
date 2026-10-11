@@ -1,0 +1,256 @@
+services:
+  # === Databases ===
+  mysql-user:
+    image: mysql:8.0
+    container_name: mysql-user
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: user_db
+    ports:
+      - "3311:3306"
+    volumes:
+      - mysql-user-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-movie:
+    image: mysql:8.0
+    container_name: mysql-movie
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: movie_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-movie-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-booking:
+    image: mysql:8.0
+    container_name: mysql-booking
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: booking_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql-booking-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-payment:
+    image: mysql:8.0
+    container_name: mysql-payment
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: payment_db
+    ports:
+      - "3309:3306"
+    volumes:
+      - mysql-payment-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-notification:
+    image: mysql:8.0
+    container_name: mysql-notification
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: notification_db
+    ports:
+      - "3310:3306"
+    volumes:
+      - mysql-notification-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql-review:
+    image: mysql:8.0
+    container_name: mysql-review
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_DATABASE: review_db
+    ports:
+      - "3312:3306"
+    volumes:
+      - mysql-review-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === RabbitMQ ===
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === Services ===
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-user:3306/user_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+    depends_on:
+      mysql-user:
+        condition: service_healthy
+
+  movie-service:
+    build:
+      context: ./movie-service
+      dockerfile: Dockerfile
+    container_name: movie-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-movie:3306/movie_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - CLOUDINARY_CLOUD_NAME=zqs7nwss
+      - CLOUDINARY_API_KEY=291929936858848
+      - CLOUDINARY_API_SECRET=c7NHkAx7IhWgcRKack1l3n08UJo
+    depends_on:
+      mysql-movie:
+        condition: service_healthy
+
+  booking-service:
+    build:
+      context: ./booking-service
+      dockerfile: Dockerfile
+    container_name: booking-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-booking:3306/booking_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+      - MOVIE_SERVICE_URL=http://movie-service:8082
+    depends_on:
+      mysql-booking:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: payment-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-payment:3306/payment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+    depends_on:
+      mysql-payment:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-notification:3306/notification_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+    depends_on:
+      mysql-notification:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  review-service:
+    build:
+      context: ./review-service
+      dockerfile: Dockerfile
+    container_name: review-service
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-review:3306/review_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_RABBITMQ_HOST=rabbitmq
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=guest
+      - SPRING_RABBITMQ_PASSWORD=guest
+    depends_on:
+      mysql-review:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  mysql-user-data:
+  mysql-movie-data:
+  mysql-booking-data:
+  mysql-payment-data:
+  mysql-notification-data:
+  mysql-review-data:

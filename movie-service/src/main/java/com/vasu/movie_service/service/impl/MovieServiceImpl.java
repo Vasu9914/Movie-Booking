@@ -2,6 +2,7 @@ package com.vasu.movie_service.service.impl;
 
 import com.vasu.movie_service.dto.request.MovieCreateRequest;
 import com.vasu.movie_service.dto.request.MovieUpdateRequest;
+import com.vasu.movie_service.dto.request.StatusChangeRequest;
 import com.vasu.movie_service.dto.response.MovieResponse;
 import com.vasu.movie_service.entity.Movie;
 import com.vasu.movie_service.enums.EntityStatus;
@@ -63,6 +64,14 @@ public class MovieServiceImpl implements MovieService {
         movieMapper.updateEntity(request, movie);
         Movie updated = movieRepository.save(movie);
         return movieMapper.toResponse(updated);
+    }
+
+    @Override
+    public void updateMovieStatus(Long id, StatusChangeRequest request) {
+        Movie movie = movieRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Movie", id));
+        movie.setStatus(request.getStatus());
+        movieRepository.save(movie);
     }
 
     @Override
