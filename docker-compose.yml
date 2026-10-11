@@ -5,14 +5,14 @@ services:
     container_name: mysql-user
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: user_db
     ports:
       - "3311:3306"
     volumes:
       - mysql-user-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,14 +22,14 @@ services:
     container_name: mysql-movie
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: movie_db
     ports:
       - "3307:3306"
     volumes:
       - mysql-movie-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,14 +39,14 @@ services:
     container_name: mysql-booking
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: booking_db
     ports:
       - "3308:3306"
     volumes:
       - mysql-booking-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,14 +56,14 @@ services:
     container_name: mysql-payment
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: payment_db
     ports:
       - "3309:3306"
     volumes:
       - mysql-payment-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -73,14 +73,14 @@ services:
     container_name: mysql-notification
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: notification_db
     ports:
       - "3310:3306"
     volumes:
       - mysql-notification-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,14 +90,14 @@ services:
     container_name: mysql-review
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: vasu@278
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: review_db
     ports:
       - "3312:3306"
     volumes:
       - mysql-review-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pvasu@278"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -132,7 +132,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-user:3306/user_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
     depends_on:
       mysql-user:
         condition: service_healthy
@@ -149,10 +149,10 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-movie:3306/movie_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
-      - CLOUDINARY_CLOUD_NAME=zqs7nwss
-      - CLOUDINARY_API_KEY=291929936858848
-      - CLOUDINARY_API_SECRET=c7NHkAx7IhWgcRKack1l3n08UJo
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     depends_on:
       mysql-movie:
         condition: service_healthy
@@ -169,7 +169,7 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-booking:3306/booking_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
@@ -192,7 +192,7 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-payment:3306/payment_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
@@ -214,7 +214,7 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-notification:3306/notification_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
@@ -236,7 +236,7 @@ services:
     environment:
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-review:3306/review_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=vasu@278
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-root}
       - SPRING_RABBITMQ_HOST=rabbitmq
       - SPRING_RABBITMQ_PORT=5672
       - SPRING_RABBITMQ_USERNAME=guest
