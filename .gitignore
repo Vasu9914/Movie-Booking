@@ -115,6 +115,7 @@ site/jacoco/
 # Postman (environment files may contain secrets)
 postman/*.environment.json
 postman/*.environment.yaml
+postman/*postman_environment*
 postman/environments/
 
 # Postman auto-generated copy folders
