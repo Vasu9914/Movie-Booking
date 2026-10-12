@@ -1,9 +1,13 @@
 package com.vasu.movie_service.config;
 
+import com.vasu.movie_service.security.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -11,7 +15,10 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 @Configuration
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -19,11 +26,16 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/movies/**", "/api/theatres/**", "/api/screens/**", "/api/shows/**").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/movies/**", "/api/theatres/**", "/api/screens/**", "/api/shows/**").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/movies/**", "/api/theatres/**", "/api/screens/**", "/api/shows/**").hasRole("ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/movies/**", "/api/theatres/**", "/api/screens/**", "/api/shows/**").hasRole("ADMIN")
+                        .requestMatchers("/api/movies/**", "/api/theatres/**", "/api/screens/**", "/api/shows/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .anyRequest().authenticated()
-                );
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 

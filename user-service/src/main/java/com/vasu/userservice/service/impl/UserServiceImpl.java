@@ -8,6 +8,7 @@ import com.vasu.userservice.dto.response.LoginResponse;
 import com.vasu.userservice.dto.response.ProfileResponse;
 import com.vasu.userservice.entity.User;
 import com.vasu.userservice.enums.UserStatus;
+import com.vasu.userservice.enums.UserRole;
 import com.vasu.userservice.exception.DuplicateResourceException;
 import com.vasu.userservice.exception.ResourceNotFoundException;
 import com.vasu.userservice.mapper.UserMapper;
@@ -38,6 +39,7 @@ public class UserServiceImpl implements UserService {
                 .name(request.getName())
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .role(UserRole.USER)
                 .status(UserStatus.ACTIVE)
                 .build();
         User saved = userRepository.save(user);
@@ -57,7 +59,7 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Account is not active");
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole());
         return LoginResponse.builder()
                 .token(token)
                 .email(user.getEmail())

@@ -25,6 +25,7 @@ import com.vasu.bookingservice.repository.BookingSeatRepository;
 import com.vasu.bookingservice.repository.SeatHoldRepository;
 import com.vasu.bookingservice.repository.ShowSeatRepository;
 import com.vasu.bookingservice.service.BookingService;
+import com.vasu.bookingservice.service.SeatHoldRedisService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Pageable;
@@ -57,9 +58,13 @@ public class BookingServiceImpl implements BookingService {
     private final BookingMapper bookingMapper;
     private final BookingEventProcessor bookingEventProcessor;
     private final RestTemplate restTemplate;
+    private final SeatHoldRedisService seatHoldRedisService;
 
     @Value("${movie.service.url}")
     private String movieServiceUrl;
+
+    @Value("${booking.seat-hold.ttl:900}")
+    private long seatHoldTtlSeconds;
 
     public BookingServiceImpl(ShowSeatRepository showSeatRepository,
                               BookingRepository bookingRepository,
@@ -67,7 +72,8 @@ public class BookingServiceImpl implements BookingService {
                               SeatHoldRepository seatHoldRepository,
                               BookingMapper bookingMapper,
                               @Lazy BookingEventProcessor bookingEventProcessor,
-                              RestTemplate restTemplate) {
+                              RestTemplate restTemplate,
+                              SeatHoldRedisService seatHoldRedisService) {
         this.showSeatRepository = showSeatRepository;
         this.bookingRepository = bookingRepository;
         this.bookingSeatRepository = bookingSeatRepository;
@@ -75,6 +81,7 @@ public class BookingServiceImpl implements BookingService {
         this.bookingMapper = bookingMapper;
         this.bookingEventProcessor = bookingEventProcessor;
         this.restTemplate = restTemplate;
+        this.seatHoldRedisService = seatHoldRedisService;
     }
 
     private static final int HOLD_MINUTES = 15;
@@ -129,6 +136,9 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         seatHoldRepository.save(seatHold);
 
+        // Store in Redis with TTL for automatic expiry
+        seatHoldRedisService.storeHold(holdReference, userId, showId, seatIds, seatHoldTtlSeconds);
+
         return HoldResponse.builder()
                 .holdReference(holdReference)
                 .seats(bookingMapper.toSeatResponseList(seats))
@@ -160,15 +170,26 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     public BookingResponse createBooking(Long userId, BookingCreateRequest request) {
-        // Validate that the hold exists and is active
+        // Validate that the hold exists and is active in the database
         SeatHold seatHold = seatHoldRepository.findByHoldReferenceAndStatus(
                         request.getHoldReference(), HoldStatus.ACTIVE)
                 .orElseThrow(() -> new ResourceNotFoundException("Active hold", request.getHoldReference()));
 
-        // Check if the hold has expired
+        // Check if the hold has expired in the database
         if (LocalDateTime.now().isAfter(seatHold.getExpiresAt())) {
             seatHoldRepository.updateStatusByHoldReference(request.getHoldReference(), HoldStatus.EXPIRED);
             throw new SeatUnavailableException("Hold has expired");
+        }
+
+        // Also verify the hold is still active in Redis (TTL-based check)
+        if (!seatHoldRedisService.isHoldActive(request.getHoldReference())) {
+            // Redis TTL expired - mark DB hold as expired and release seats
+            seatHoldRepository.updateStatusByHoldReference(request.getHoldReference(), HoldStatus.EXPIRED);
+            List<Long> seatIds = seatHold.getShowSeatIds();
+            if (!seatIds.isEmpty()) {
+                showSeatRepository.releaseSeats(seatIds);
+            }
+            throw new SeatUnavailableException("Hold has expired (session timeout)");
         }
 
         // Verify that the seat IDs match the hold
@@ -179,6 +200,9 @@ public class BookingServiceImpl implements BookingService {
 
         // Mark the hold as consumed
         seatHoldRepository.updateStatusByHoldReference(request.getHoldReference(), HoldStatus.CONSUMED);
+
+        // Remove from Redis since the hold is consumed
+        seatHoldRedisService.releaseHold(request.getHoldReference());
 
         String bookingReference = UUID.randomUUID().toString();
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
@@ -319,6 +343,32 @@ public class BookingServiceImpl implements BookingService {
         if (!seatIds.isEmpty()) {
             showSeatRepository.releaseSeats(seatIds);
         }
+
+        // Remove from Redis
+        seatHoldRedisService.releaseHold(holdReference);
+    }
+
+    @Override
+    public List<com.vasu.bookingservice.dto.response.UserHoldInfo> getUserActiveHolds(Long userId) {
+        return seatHoldRedisService.getUserHoldDetails(userId);
+    }
+
+    @Override
+    public void releaseAllUserHolds(Long userId) {
+        // Release all Redis holds first to get the hold references
+        List<String> holdRefs = seatHoldRedisService.getUserActiveHolds(userId);
+
+        // Release each hold in the database as well
+        for (String holdRef : holdRefs) {
+            seatHoldRepository.updateStatusByHoldReference(holdRef, HoldStatus.RELEASED);
+            List<Long> seatIds = seatHoldRedisService.getHoldSeatIds(holdRef);
+            if (!seatIds.isEmpty()) {
+                showSeatRepository.releaseSeats(seatIds);
+            }
+        }
+
+        // Release all from Redis
+        seatHoldRedisService.releaseAllUserHolds(userId);
     }
 
     @Override

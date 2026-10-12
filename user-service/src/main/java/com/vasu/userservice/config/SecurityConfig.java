@@ -91,7 +91,6 @@ public class SecurityConfig {
                 String token = authHeader.substring(7);
                 if (jwtUtil.validateToken(token)) {
                     Long userId = jwtUtil.getUserIdFromToken(token);
-                    String email = jwtUtil.getEmailFromToken(token);
                     UserDetails userDetails = User.builder()
                             .username(String.valueOf(userId))
                             .password("")

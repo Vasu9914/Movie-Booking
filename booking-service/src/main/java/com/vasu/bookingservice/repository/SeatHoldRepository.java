@@ -8,12 +8,15 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
 
     Optional<SeatHold> findByHoldReferenceAndStatus(String holdReference, HoldStatus status);
+
+    List<SeatHold> findByStatus(HoldStatus status);
 
     @Modifying
     @Query("UPDATE SeatHold h SET h.status = :status WHERE h.holdReference = :holdReference AND h.status = HoldStatus.ACTIVE")

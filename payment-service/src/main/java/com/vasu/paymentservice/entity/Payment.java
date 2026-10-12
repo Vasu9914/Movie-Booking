@@ -48,6 +48,15 @@ public class Payment {
     @Column(name = "provider_transaction_id", length = 150)
     private String providerTransactionId;
 
+    @Column(name = "razorpay_order_id", length = 150)
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_payment_id", length = 150)
+    private String razorpayPaymentId;
+
+    @Column(name = "razorpay_signature", length = 255)
+    private String razorpaySignature;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

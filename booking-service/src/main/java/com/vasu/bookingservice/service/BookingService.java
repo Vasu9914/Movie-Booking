@@ -8,6 +8,7 @@ import com.vasu.bookingservice.dto.response.BookingResponse;
 import com.vasu.bookingservice.dto.response.BookingSeatResponse;
 import com.vasu.bookingservice.dto.response.HoldResponse;
 import com.vasu.bookingservice.dto.response.SeatResponse;
+import com.vasu.bookingservice.dto.response.UserHoldInfo;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -37,4 +38,8 @@ public interface BookingService {
     void releaseHold(String holdReference);
 
     boolean hasValidBookingForMovie(Long userId, Long movieId);
+
+    List<UserHoldInfo> getUserActiveHolds(Long userId);
+
+    void releaseAllUserHolds(Long userId);
 }

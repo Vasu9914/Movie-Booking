@@ -24,5 +24,6 @@ public class PaymentResponse {
     private String providerTransactionId;
     private String razorpayOrderId;
     private String razorpayPaymentId;
+    private String razorpaySignature;
     private LocalDateTime createdAt;
 }

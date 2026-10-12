@@ -1,6 +1,7 @@
 package com.vasu.userservice.entity;
 
 import com.vasu.userservice.enums.UserStatus;
+import com.vasu.userservice.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.data.annotation.CreatedDate;
@@ -30,6 +31,10 @@ public class User {
 
     @Column(name = "password_hash", nullable = false, length = 255)
     private String passwordHash;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

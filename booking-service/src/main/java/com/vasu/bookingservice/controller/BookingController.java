@@ -8,6 +8,7 @@ import com.vasu.bookingservice.dto.response.BookingResponse;
 import com.vasu.bookingservice.dto.response.BookingSeatResponse;
 import com.vasu.bookingservice.dto.response.HoldResponse;
 import com.vasu.bookingservice.dto.response.SeatResponse;
+import com.vasu.bookingservice.dto.response.UserHoldInfo;
 import com.vasu.bookingservice.service.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -86,5 +87,16 @@ public class BookingController {
     @GetMapping("/api/bookings/{bookingReference}/seats")
     public List<BookingSeatResponse> getBookingSeats(@PathVariable String bookingReference) {
         return bookingService.getBookingSeats(bookingReference);
+    }
+
+    @GetMapping("/api/bookings/holds/me")
+    public List<UserHoldInfo> getUserActiveHolds(@RequestHeader("X-User-Id") Long userId) {
+        return bookingService.getUserActiveHolds(userId);
+    }
+
+    @DeleteMapping("/api/bookings/holds/me")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void releaseAllUserHolds(@RequestHeader("X-User-Id") Long userId) {
+        bookingService.releaseAllUserHolds(userId);
     }
 }
