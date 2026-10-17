@@ -112,14 +112,8 @@ site/jacoco/
 # **/pom.xml.next
 
 # -----------------
-# Postman (environment files may contain secrets)
-postman/*.environment.json
-postman/*.environment.yaml
-postman/*postman_environment*
-postman/environments/
-
-# Postman auto-generated copy folders
-postman/collections/* Copy/
+# Postman (entire folder excluded from repo)
+postman/
 
 # -----------------
 # Junie agent files (plans, sessions, settings)
