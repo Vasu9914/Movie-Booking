@@ -114,6 +114,7 @@ site/jacoco/
 # -----------------
 # Postman (entire folder excluded from repo)
 postman/
+.postman/
 
 # -----------------
 # Junie agent files (plans, sessions, settings)
