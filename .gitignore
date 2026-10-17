@@ -122,5 +122,5 @@ postman/environments/
 postman/collections/* Copy/
 
 # -----------------
-# Junie agent session data (keep guidelines, ignore sessions)
-.junie/sessions/
+# Junie agent files (plans, sessions, settings)
+.junie/
