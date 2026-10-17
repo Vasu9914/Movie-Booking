@@ -118,3 +118,7 @@ postman/
 # -----------------
 # Junie agent files (plans, sessions, settings)
 .junie/
+
+# -----------------
+# Generated Markdown documentation
+*.md
