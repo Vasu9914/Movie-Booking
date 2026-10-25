@@ -1,0 +1,14 @@
+{
+  "name": "movie-booking",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test-all-apis.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Vasu9914/Movie-Booking.git"
+  },
+  "private": true
+}
