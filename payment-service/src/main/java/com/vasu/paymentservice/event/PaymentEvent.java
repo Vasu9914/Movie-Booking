@@ -20,4 +20,5 @@ public class PaymentEvent {
     private String currency;
     private String status;
     private String transactionId;
+    private String correlationId;
 }

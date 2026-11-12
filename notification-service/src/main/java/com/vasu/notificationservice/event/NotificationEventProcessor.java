@@ -64,4 +64,38 @@ public class NotificationEventProcessor {
             log.error("Failed to create notification for booking cancellation: {}", event.getBookingReference(), e);
         }
     }
+
+    @RabbitListener(queues = RabbitMQConfig.REFUND_SUCCESS_QUEUE)
+    public void handleRefundSuccess(RefundEvent refundEvent) {
+        log.info("Received refund success event for booking: {}", refundEvent.getBookingReference());
+        try {
+            notificationService.createNotification(
+                    refundEvent.getUserId(),
+                    refundEvent.getBookingReference(),
+                    "EMAIL",
+                    "user-" + refundEvent.getUserId() + "@example.com",
+                    "refund-success-" + refundEvent.getRefundReference()
+            );
+            log.info("Notification created for refund success: {}", refundEvent.getRefundReference());
+        } catch (Exception e) {
+            log.error("Failed to create notification for refund success: {}", refundEvent.getRefundReference(), e);
+        }
+    }
+
+    @RabbitListener(queues = RabbitMQConfig.REFUND_FAILED_QUEUE)
+    public void handleRefundFailed(RefundEvent refundEvent) {
+        log.info("Received refund failed event for booking: {}", refundEvent.getBookingReference());
+        try {
+            notificationService.createNotification(
+                    refundEvent.getUserId(),
+                    refundEvent.getBookingReference(),
+                    "EMAIL",
+                    "user-" + refundEvent.getUserId() + "@example.com",
+                    "refund-failed-" + refundEvent.getRefundReference()
+            );
+            log.info("Notification created for refund failure: {}", refundEvent.getRefundReference());
+        } catch (Exception e) {
+            log.error("Failed to create notification for refund failure: {}", refundEvent.getRefundReference(), e);
+        }
+    }
 }

@@ -3,7 +3,6 @@ package com.vasu.paymentservice.service;
 import com.vasu.paymentservice.dto.request.PaymentRequest;
 import com.vasu.paymentservice.dto.request.RazorpayVerifyRequest;
 import com.vasu.paymentservice.dto.request.RefundRequest;
-import com.vasu.paymentservice.dto.request.VerifyPaymentRequest;
 import com.vasu.paymentservice.dto.request.WebhookPayload;
 import com.vasu.paymentservice.dto.response.PaymentResponse;
 import com.vasu.paymentservice.dto.response.RefundResponse;
@@ -21,17 +20,15 @@ public interface PaymentService {
 
     List<PaymentResponse> getPaymentsByBookingReference(String bookingReference);
 
-    PaymentResponse retryPayment(String paymentReference);
-
     RefundResponse requestRefund(String paymentReference, RefundRequest request);
 
     List<RefundResponse> getRefundsByPaymentReference(String paymentReference);
 
     RefundResponse getRefundByReference(String refundReference);
 
-    Map<String, Object> verifyPayment(VerifyPaymentRequest request);
-
     Map<String, Object> verifyRazorpayPayment(RazorpayVerifyRequest request);
 
     void handleRazorpayWebhook(WebhookPayload payload, String signature);
+
+    String getPaymentStatusByBookingReference(String bookingReference);
 }

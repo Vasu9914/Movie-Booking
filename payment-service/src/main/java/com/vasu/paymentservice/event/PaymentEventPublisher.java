@@ -30,4 +30,22 @@ public class PaymentEventPublisher {
                 paymentEvent
         );
     }
+
+    public void publishRefundSuccess(RefundEvent refundEvent) {
+        log.info("Publishing refund success event for refund: {}", refundEvent.getRefundReference());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.PAYMENT_EVENT_EXCHANGE,
+                RabbitMQConfig.REFUND_SUCCESS_ROUTING_KEY,
+                refundEvent
+        );
+    }
+
+    public void publishRefundFailed(RefundEvent refundEvent) {
+        log.info("Publishing refund failed event for refund: {}", refundEvent.getRefundReference());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.PAYMENT_EVENT_EXCHANGE,
+                RabbitMQConfig.REFUND_FAILED_ROUTING_KEY,
+                refundEvent
+        );
+    }
 }

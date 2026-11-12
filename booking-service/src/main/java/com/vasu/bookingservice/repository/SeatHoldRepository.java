@@ -18,7 +18,13 @@ public interface SeatHoldRepository extends JpaRepository<SeatHold, Long> {
 
     List<SeatHold> findByStatus(HoldStatus status);
 
+    List<SeatHold> findByUserIdAndStatus(Long userId, HoldStatus status);
+
     @Modifying
     @Query("UPDATE SeatHold h SET h.status = :status WHERE h.holdReference = :holdReference AND h.status = HoldStatus.ACTIVE")
     int updateStatusByHoldReference(@Param("holdReference") String holdReference, @Param("status") HoldStatus status);
+
+    @Modifying
+    @Query("SELECT h.showSeatIds FROM SeatHold h WHERE h.holdReference = :holdReference")
+    List<List<Long>> findSeatIdsByHoldReference(@Param("holdReference") String holdReference);
 }

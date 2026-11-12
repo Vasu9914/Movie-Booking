@@ -81,7 +81,7 @@ public class BookingController {
     @PostMapping("/api/bookings/{bookingReference}/cancel")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelBooking(@PathVariable String bookingReference) {
-        bookingService.cancelBooking(bookingReference);
+        bookingService.cancelBooking(bookingReference, null);
     }
 
     @GetMapping("/api/bookings/{bookingReference}/seats")

@@ -1,8 +1,8 @@
 # Stage 1: Build
 FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
-COPY pom.xml .
-COPY src ./src
+COPY booking-service/pom.xml .
+COPY booking-service/src ./src
 RUN mvn clean package -Dmaven.test.skip=true
 
 # Stage 2: Run

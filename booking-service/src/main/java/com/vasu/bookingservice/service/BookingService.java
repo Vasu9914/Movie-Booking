@@ -31,7 +31,11 @@ public interface BookingService {
 
     BookingResponse confirmBooking(String bookingReference);
 
-    void cancelBooking(String bookingReference);
+    void cancelBooking(String bookingReference, String correlationId);
+
+    void cancelBookingForConsumer(String bookingReference, String correlationId);
+
+    void handleRefund(String bookingReference);
 
     List<BookingSeatResponse> getBookingSeats(String bookingReference);
 

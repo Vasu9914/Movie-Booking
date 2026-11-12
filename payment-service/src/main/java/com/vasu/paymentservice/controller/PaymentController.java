@@ -4,7 +4,6 @@ import com.vasu.paymentservice.config.RazorpayConfig;
 import com.vasu.paymentservice.dto.request.PaymentRequest;
 import com.vasu.paymentservice.dto.request.RazorpayVerifyRequest;
 import com.vasu.paymentservice.dto.request.RefundRequest;
-import com.vasu.paymentservice.dto.request.VerifyPaymentRequest;
 import com.vasu.paymentservice.dto.request.WebhookPayload;
 import com.vasu.paymentservice.dto.response.PaymentResponse;
 import com.vasu.paymentservice.dto.response.RefundResponse;
@@ -50,11 +49,6 @@ public class PaymentController {
         return paymentService.getPaymentsByBookingReference(bookingReference);
     }
 
-    @PostMapping("/api/payments/{paymentReference}/retry")
-    public PaymentResponse retryPayment(@PathVariable String paymentReference) {
-        return paymentService.retryPayment(paymentReference);
-    }
-
     @PostMapping("/api/payments/{paymentReference}/refunds")
     @ResponseStatus(HttpStatus.CREATED)
     public RefundResponse requestRefund(@PathVariable String paymentReference,
@@ -73,19 +67,13 @@ public class PaymentController {
     }
 
     /**
-     * Verify payment (mock mode).
-     * Request body: { paymentReference }
-     * Response: { success: true/false, message, paymentReference, bookingReference }
+     * Get payment status by booking reference.
+     * Returns: SUCCESS, FAILED, PENDING, REFUNDED, or NOT_FOUND.
      */
-    @PostMapping("/api/payments/verify")
-    public ResponseEntity<Map<String, Object>> verifyPayment(@Valid @RequestBody VerifyPaymentRequest request) {
-        Map<String, Object> result = paymentService.verifyPayment(request);
-        boolean success = (boolean) result.get("success");
-        if (success) {
-            return ResponseEntity.ok(result);
-        } else {
-            return ResponseEntity.badRequest().body(result);
-        }
+    @GetMapping("/api/payments/status/{bookingReference}")
+    public Map<String, String> getPaymentStatus(@PathVariable String bookingReference) {
+        String status = paymentService.getPaymentStatusByBookingReference(bookingReference);
+        return Map.of("status", status);
     }
 
     /**
@@ -107,7 +95,7 @@ public class PaymentController {
 
     /**
      * Razorpay webhook endpoint to handle payment events.
-     * Expects the X-Razorpay-Signature header for signature verification.
+         * Requires the X-Razorpay-Signature header for mandatory signature verification.
      */
     @PostMapping("/api/payments/webhooks/razorpay")
     public ResponseEntity<String> handleRazorpayWebhook(
@@ -117,21 +105,23 @@ public class PaymentController {
 
         log.info("Received Razorpay webhook");
 
-        // Parse the raw body into WebhookPayload
+        // Signature verification is mandatory - reject webhooks without a signature
+        if (signature == null || signature.isEmpty()) {
+            log.warn("Razorpay webhook received without X-Razorpay-Signature header");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Missing signature");
+        }
+
+        // Verify signature using the raw body (required for HMAC validation)
+        String expectedSignature = generateHmacSha256(rawBody, getWebhookSecret());
+        if (!constantTimeEquals(expectedSignature, signature)) {
+            log.warn("Invalid Razorpay webhook signature");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid signature");
+        }
+
+        // Parse the raw body into WebhookPayload only after signature is verified
         try {
             com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
             WebhookPayload payload = objectMapper.readValue(rawBody, WebhookPayload.class);
-
-            // Verify signature if provided
-            if (signature != null && !signature.isEmpty()) {
-                // For proper signature verification, we need the raw body
-                // Generate expected signature from raw body
-                String expectedSignature = generateHmacSha256(rawBody, getWebhookSecret());
-                if (!constantTimeEquals(expectedSignature, signature)) {
-                    log.warn("Invalid Razorpay webhook signature");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid signature");
-                }
-            }
 
             // Process the webhook
             paymentService.handleRazorpayWebhook(payload, signature);

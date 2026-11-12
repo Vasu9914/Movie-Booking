@@ -7,7 +7,6 @@ import com.vasu.paymentservice.config.RazorpayConfig;
 import com.vasu.paymentservice.dto.request.PaymentRequest;
 import com.vasu.paymentservice.dto.request.RazorpayVerifyRequest;
 import com.vasu.paymentservice.dto.request.RefundRequest;
-import com.vasu.paymentservice.dto.request.VerifyPaymentRequest;
 import com.vasu.paymentservice.dto.request.WebhookPayload;
 import com.vasu.paymentservice.dto.response.PaymentResponse;
 import com.vasu.paymentservice.dto.response.RefundResponse;
@@ -17,6 +16,7 @@ import com.vasu.paymentservice.enums.PaymentStatus;
 import com.vasu.paymentservice.enums.RefundStatus;
 import com.vasu.paymentservice.event.PaymentEvent;
 import com.vasu.paymentservice.event.PaymentEventPublisher;
+import com.vasu.paymentservice.event.RefundEvent;
 import com.vasu.paymentservice.exception.ResourceNotFoundException;
 import com.vasu.paymentservice.mapper.PaymentMapper;
 import com.vasu.paymentservice.repository.PaymentRepository;
@@ -25,11 +25,15 @@ import com.vasu.paymentservice.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
@@ -43,14 +47,16 @@ import java.util.UUID;
 @Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
-    private static final String MOCK_ORDER_PREFIX = "order_mock_";
-
     private final PaymentRepository paymentRepository;
     private final RefundRepository refundRepository;
     private final PaymentMapper paymentMapper;
     private final PaymentEventPublisher paymentEventPublisher;
     private final RazorpayConfig razorpayConfig;
+    private final RestTemplate restTemplate;
     private RazorpayClient razorpayClient;
+
+    @Value("${booking.service.url}")
+    private String bookingServiceUrl;
 
     @Autowired(required = false)
     public void setRazorpayClient(RazorpayClient razorpayClient) {
@@ -68,17 +74,51 @@ public class PaymentServiceImpl implements PaymentService {
             return paymentMapper.toPaymentResponse(existing);
         }
 
-        // TODO: don't trust request.getAmount(); fetch/validate it against the booking service
+        // Fetch the booking from the booking service to get the authoritative amount
+        BigDecimal amount = fetchBookingAmount(request.getBookingReference());
+        if (amount == null) {
+            throw new ResourceNotFoundException("Booking not found: " + request.getBookingReference());
+        }
+
         Payment payment = Payment.builder()
                 .paymentReference(UUID.randomUUID().toString())
                 .bookingReference(request.getBookingReference())
                 .userId(request.getUserId())
                 .idempotencyKey(request.getIdempotencyKey())
-                .amount(request.getAmount())
+                .amount(amount)
                 .currency(request.getCurrency())
                 .status(PaymentStatus.PENDING)
                 .build();
         return paymentMapper.toPaymentResponse(paymentRepository.save(payment));
+    }
+
+    /**
+     * Calls the Booking Service to get the booking's total amount.
+     */
+    private BigDecimal fetchBookingAmount(String bookingReference) {
+        try {
+            String url = bookingServiceUrl + "/api/bookings/" + bookingReference;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {}
+            );
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object totalAmount = response.getBody().get("totalAmount");
+                if (totalAmount != null) {
+                    return new BigDecimal(totalAmount.toString());
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to fetch booking amount for {}: {}", bookingReference, e.getMessage());
+        }
+        return null;
     }
 
     @Override
@@ -91,17 +131,6 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional(readOnly = true)
     public List<PaymentResponse> getPaymentsByBookingReference(String bookingReference) {
         return paymentMapper.toPaymentResponseList(paymentRepository.findByBookingReference(bookingReference));
-    }
-
-    @Override
-    public PaymentResponse retryPayment(String paymentReference) {
-        Payment payment = findPayment(paymentReference);
-        // Without webhooks nothing marks a payment FAILED, so PENDING can be retried too
-        if (payment.getStatus() != PaymentStatus.FAILED && payment.getStatus() != PaymentStatus.PENDING) {
-            throw new IllegalStateException("Only pending or failed payments can be retried");
-        }
-        payment.setStatus(PaymentStatus.PENDING);
-        return paymentMapper.toPaymentResponse(paymentRepository.save(payment));
     }
 
     // ------------------------------------------------------------------
@@ -120,15 +149,88 @@ public class PaymentServiceImpl implements PaymentService {
             return paymentMapper.toRefundResponse(existing);
         }
 
-        // NOTE: this only records the refund as PENDING; it does not call Razorpay yet
-        Refund refund = Refund.builder()
-                .paymentId(payment.getId())
-                .refundReference(UUID.randomUUID().toString())
-                .idempotencyKey(request.getIdempotencyKey())
-                .amount(request.getAmount())
-                .status(RefundStatus.PENDING)
-                .build();
-        return paymentMapper.toRefundResponse(refundRepository.save(refund));
+        // Validate refund amount does not exceed payment amount
+        if (request.getAmount().compareTo(payment.getAmount()) > 0) {
+            throw new IllegalStateException("Refund amount cannot exceed payment amount");
+        }
+
+        String razorpayPaymentId = payment.getRazorpayPaymentId();
+        if (razorpayPaymentId == null || razorpayPaymentId.isBlank()) {
+            throw new IllegalStateException("Cannot refund: no Razorpay payment ID found for payment: " + paymentReference);
+        }
+
+        if (!razorpayConfig.isEnabled() || razorpayClient == null) {
+            throw new IllegalStateException("Razorpay is not configured. Please set up Razorpay credentials.");
+        }
+
+        String correlationId = UUID.randomUUID().toString();
+
+        // Call Razorpay to process the refund
+        try {
+            org.json.JSONObject refundRequestJson = new org.json.JSONObject();
+            refundRequestJson.put("amount", request.getAmount().movePointRight(2).longValueExact());
+            refundRequestJson.put("currency", payment.getCurrency() != null ? payment.getCurrency().toUpperCase() : "INR");
+
+            com.razorpay.Refund razorpayRefund = razorpayClient.payments.refund(razorpayPaymentId, refundRequestJson);
+            String providerRefundId = razorpayRefund.get("id");
+
+            log.info("Razorpay refund created: {} for payment: {}", providerRefundId, paymentReference);
+
+            Refund refund = Refund.builder()
+                    .paymentId(payment.getId())
+                    .refundReference(UUID.randomUUID().toString())
+                    .idempotencyKey(request.getIdempotencyKey())
+                    .amount(request.getAmount())
+                    .status(RefundStatus.SUCCESS)
+                    .providerRefundId(providerRefundId)
+                    .build();
+
+            Refund savedRefund = refundRepository.save(refund);
+
+            // Publish refund success event
+            RefundEvent successEvent = RefundEvent.builder()
+                    .refundReference(savedRefund.getRefundReference())
+                    .paymentReference(payment.getPaymentReference())
+                    .bookingReference(payment.getBookingReference())
+                    .userId(payment.getUserId())
+                    .amount(savedRefund.getAmount())
+                    .currency(payment.getCurrency())
+                    .status("SUCCESS")
+                    .providerRefundId(savedRefund.getProviderRefundId())
+                    .correlationId(correlationId)
+                    .build();
+            paymentEventPublisher.publishRefundSuccess(successEvent);
+
+            log.info("Refund processed: {} for payment: {} booking: {}",
+                    savedRefund.getRefundReference(), paymentReference, payment.getBookingReference());
+
+            return paymentMapper.toRefundResponse(savedRefund);
+        } catch (RazorpayException e) {
+            log.error("Failed to process Razorpay refund for payment: {}", paymentReference, e);
+
+            Refund refund = Refund.builder()
+                    .paymentId(payment.getId())
+                    .refundReference(UUID.randomUUID().toString())
+                    .idempotencyKey(request.getIdempotencyKey())
+                    .amount(request.getAmount())
+                    .status(RefundStatus.FAILED)
+                    .build();
+
+            // Publish refund failed event
+            RefundEvent failedEvent = RefundEvent.builder()
+                    .refundReference(refund.getRefundReference())
+                    .paymentReference(payment.getPaymentReference())
+                    .bookingReference(payment.getBookingReference())
+                    .userId(payment.getUserId())
+                    .amount(request.getAmount())
+                    .currency(payment.getCurrency())
+                    .status("FAILED")
+                    .correlationId(correlationId)
+                    .build();
+            paymentEventPublisher.publishRefundFailed(failedEvent);
+
+            return paymentMapper.toRefundResponse(refundRepository.save(refund));
+        }
     }
 
     @Override
@@ -166,16 +268,13 @@ public class PaymentServiceImpl implements PaymentService {
 
         long amountInPaise = payment.getAmount().movePointRight(2).longValueExact();
         String currency = payment.getCurrency().toUpperCase();
-        boolean realMode = razorpayConfig.isEnabled() && razorpayClient != null;
+        if (razorpayConfig.isEnabled() && razorpayClient != null) {
+            // Reuse the existing real order so a double click doesn't create a second one
+            String existingOrderId = payment.getRazorpayOrderId();
+            if (existingOrderId != null) {
+                return orderResponse(existingOrderId, amountInPaise, currency, paymentReference);
+            }
 
-        // Reuse the existing real order so a double click doesn't create a second one
-        String existingOrderId = payment.getRazorpayOrderId();
-        if (realMode && existingOrderId != null && !existingOrderId.startsWith(MOCK_ORDER_PREFIX)) {
-            return orderResponse(existingOrderId, amountInPaise, currency, paymentReference);
-        }
-
-        String orderId;
-        if (realMode) {
             try {
                 org.json.JSONObject orderRequest = new org.json.JSONObject();
                 orderRequest.put("amount", amountInPaise);
@@ -183,21 +282,20 @@ public class PaymentServiceImpl implements PaymentService {
                 orderRequest.put("receipt", paymentReference);
 
                 Order order = razorpayClient.orders.create(orderRequest);
-                orderId = order.get("id");
+                String orderId = order.get("id");
                 log.info("Razorpay order created: {} for payment: {}", orderId, paymentReference);
+
+                payment.setRazorpayOrderId(orderId);
+                paymentRepository.save(payment);
+
+                return orderResponse(orderId, amountInPaise, currency, paymentReference);
             } catch (RazorpayException e) {
                 log.error("Failed to create Razorpay order for payment: {}", paymentReference, e);
                 throw new RuntimeException("Failed to create payment order: " + e.getMessage(), e);
             }
         } else {
-            orderId = MOCK_ORDER_PREFIX + System.currentTimeMillis();
-            log.info("Mock order created: {} for payment: {}", orderId, paymentReference);
+            throw new IllegalStateException("Razorpay is not configured. Please set up Razorpay credentials.");
         }
-
-        payment.setRazorpayOrderId(orderId);
-        paymentRepository.save(payment);
-
-        return orderResponse(orderId, amountInPaise, currency, paymentReference);
     }
 
     private Map<String, Object> orderResponse(String orderId, long amountInPaise,
@@ -215,31 +313,6 @@ public class PaymentServiceImpl implements PaymentService {
     // Verification
     // ------------------------------------------------------------------
 
-    /**
-     * Mock-only verification by payment reference. Disabled when real Razorpay is on.
-     */
-    @Override
-    public Map<String, Object> verifyPayment(VerifyPaymentRequest request) {
-        if (razorpayConfig.isEnabled()) {
-            return buildFailureResponse("Use the Razorpay verify endpoint");
-        }
-
-        String paymentReference = request.getPaymentReference();
-        log.info("Mock payment verification for payment: {}", paymentReference);
-
-        Payment payment = paymentRepository.findByPaymentReference(paymentReference).orElse(null);
-        if (payment == null) {
-            return buildFailureResponse("Payment record not found. Please initiate payment first.");
-        }
-        if (payment.getStatus() == PaymentStatus.SUCCESS) {
-            return buildSuccessResponse(payment);
-        }
-
-        String transactionId = "mock_payment_" + System.currentTimeMillis();
-        markSuccess(payment, transactionId, null, null);
-        return buildSuccessResponse(payment);
-    }
-
     @Override
     public Map<String, Object> verifyRazorpayPayment(RazorpayVerifyRequest request) {
         String razorpayPaymentId = request.getRazorpayPaymentId();
@@ -248,25 +321,21 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("Verifying Razorpay payment: paymentId={}, orderId={}", razorpayPaymentId, razorpayOrderId);
 
-        if (!razorpayConfig.isEnabled()) {
-            log.info("Mock mode: skipping signature verification");
-        } else {
-            // HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
-            String expectedSignature;
-            try {
-                expectedSignature = generateHmacSha256(razorpayOrderId + "|" + razorpayPaymentId,
-                        razorpayConfig.getKeySecret());
-            } catch (Exception e) {
-                log.error("Error generating HMAC signature", e);
-                return buildFailureResponse("Payment verification failed: signature generation error");
-            }
-
-            if (!constantTimeEquals(expectedSignature, razorpaySignature)) {
-                log.warn("Invalid signature for paymentId={}, orderId={}", razorpayPaymentId, razorpayOrderId);
-                return buildFailureResponse("Payment verification failed: invalid signature");
-            }
-            log.info("Razorpay signature verified for paymentId={}", razorpayPaymentId);
+        // HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
+        String expectedSignature;
+        try {
+            expectedSignature = generateHmacSha256(razorpayOrderId + "|" + razorpayPaymentId,
+                    razorpayConfig.getKeySecret());
+        } catch (Exception e) {
+            log.error("Error generating HMAC signature", e);
+            return buildFailureResponse("Payment verification failed: signature generation error");
         }
+
+        if (!constantTimeEquals(expectedSignature, razorpaySignature)) {
+            log.warn("Invalid signature for paymentId={}, orderId={}", razorpayPaymentId, razorpayOrderId);
+            return buildFailureResponse("Payment verification failed: invalid signature");
+        }
+        log.info("Razorpay signature verified for paymentId={}", razorpayPaymentId);
 
         Payment payment = paymentRepository.findByRazorpayOrderId(razorpayOrderId).orElse(null);
         if (payment == null) {
@@ -341,6 +410,7 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus(PaymentStatus.SUCCESS);
         paymentRepository.save(payment);
 
+        String correlationId = UUID.randomUUID().toString();
         PaymentEvent event = PaymentEvent.builder()
                 .paymentReference(payment.getPaymentReference())
                 .bookingReference(payment.getBookingReference())
@@ -349,6 +419,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .currency(payment.getCurrency())
                 .status("SUCCESS")
                 .transactionId(transactionId)
+                .correlationId(correlationId)
                 .build();
         paymentEventPublisher.publishPaymentSuccess(event);
 
@@ -385,5 +456,17 @@ public class PaymentServiceImpl implements PaymentService {
     private boolean constantTimeEquals(String a, String b) {
         if (a == null || b == null) return false;
         return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String getPaymentStatusByBookingReference(String bookingReference) {
+        List<Payment> payments = paymentRepository.findByBookingReference(bookingReference);
+        if (payments.isEmpty()) {
+            return "NOT_FOUND";
+        }
+        // Return the status of the most recent payment
+        Payment latestPayment = payments.get(payments.size() - 1);
+        return latestPayment.getStatus().name();
     }
 }

@@ -23,7 +23,7 @@ public interface ShowSeatRepository extends JpaRepository<ShowSeat, Long> {
     int holdSeats(@Param("ids") List<Long> ids, @Param("status") SeatStatus status, @Param("reservedUntil") LocalDateTime reservedUntil);
 
     @Modifying
-    @Query("UPDATE ShowSeat s SET s.status = com.vasu.bookingservice.enums.SeatStatus.AVAILABLE, s.reservedUntil = null WHERE s.id IN :ids AND s.status = com.vasu.bookingservice.enums.SeatStatus.HELD")
+    @Query("UPDATE ShowSeat s SET s.status = com.vasu.bookingservice.enums.SeatStatus.AVAILABLE, s.reservedUntil = null, s.bookingId = null WHERE s.id IN :ids AND s.status = com.vasu.bookingservice.enums.SeatStatus.HELD")
     int releaseSeats(@Param("ids") List<Long> ids);
 
     @Modifying
@@ -31,6 +31,14 @@ public interface ShowSeatRepository extends JpaRepository<ShowSeat, Long> {
     int bookSeats(@Param("ids") List<Long> ids, @Param("bookingId") Long bookingId);
 
     @Modifying
-    @Query("UPDATE ShowSeat s SET s.status = com.vasu.bookingservice.enums.SeatStatus.AVAILABLE, s.reservedUntil = null WHERE s.status = com.vasu.bookingservice.enums.SeatStatus.HELD AND s.reservedUntil < CURRENT_TIMESTAMP")
+    @Query("UPDATE ShowSeat s SET s.status = com.vasu.bookingservice.enums.SeatStatus.AVAILABLE, s.reservedUntil = null, s.bookingId = null WHERE s.status = com.vasu.bookingservice.enums.SeatStatus.HELD AND s.reservedUntil < CURRENT_TIMESTAMP AND s.bookingId IS NULL")
     int expireHolds();
+
+    @Modifying
+    @Query("UPDATE ShowSeat s SET s.bookingId = :bookingId WHERE s.id IN :ids AND s.status = com.vasu.bookingservice.enums.SeatStatus.HELD")
+    int assignBookingId(@Param("ids") List<Long> ids, @Param("bookingId") Long bookingId);
+
+    @Modifying
+    @Query("UPDATE ShowSeat s SET s.status = com.vasu.bookingservice.enums.SeatStatus.AVAILABLE, s.reservedUntil = null, s.bookingId = null WHERE s.id IN :ids AND s.status = com.vasu.bookingservice.enums.SeatStatus.BOOKED")
+    int releaseBookedSeats(@Param("ids") List<Long> ids);
 }

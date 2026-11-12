@@ -13,4 +13,5 @@ public class BookingCancelledEvent {
 
     private String bookingReference;
     private Long userId;
+    private String correlationId;
 }

@@ -4,11 +4,10 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
-import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;
-import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,17 +16,23 @@ public class RabbitMQConfig {
 
     public static final String PAYMENT_EVENT_EXCHANGE = "payment.events";
     public static final String BOOKING_EVENT_EXCHANGE = "booking.events";
-    public static final String REVIEW_ELIGIBILITY_EXCHANGE = "review.eligibility.exchange";
     public static final String PAYMENT_SUCCESS_QUEUE = "booking.payment.success.queue";
     public static final String PAYMENT_FAILED_QUEUE = "booking.payment.failed.queue";
+    public static final String REFUND_SUCCESS_QUEUE = "booking.refund.success.queue";
     public static final String BOOKING_CANCELLED_QUEUE = "booking.cancelled.queue";
-    public static final String REVIEW_ELIGIBILITY_REQUEST_QUEUE = "review.eligibility.request.queue";
-    public static final String REVIEW_ELIGIBILITY_RESPONSE_QUEUE = "review.eligibility.response.queue";
     public static final String PAYMENT_SUCCESS_ROUTING_KEY = "payment.success";
     public static final String PAYMENT_FAILED_ROUTING_KEY = "payment.failed";
+    public static final String REFUND_SUCCESS_ROUTING_KEY = "refund.success";
     public static final String BOOKING_CANCELLED_ROUTING_KEY = "booking.cancelled";
-    public static final String REVIEW_ELIGIBILITY_REQUEST_ROUTING_KEY = "review.eligibility.request";
-    public static final String REVIEW_ELIGIBILITY_RESPONSE_ROUTING_KEY = "review.eligibility.response";
+    public static final String BOOKING_REFUNDED_ROUTING_KEY = "booking.refunded";
+
+    public static final String PAYMENT_DLX = "payment.dlx";
+    public static final String PAYMENT_SUCCESS_DLQ = "booking.payment.success.dlq";
+    public static final String PAYMENT_FAILED_DLQ = "booking.payment.failed.dlq";
+    public static final String REFUND_SUCCESS_DLQ = "booking.refund.success.dlq";
+    public static final String PAYMENT_SUCCESS_DLQ_ROUTING_KEY = "payment.success.dlq";
+    public static final String PAYMENT_FAILED_DLQ_ROUTING_KEY = "payment.failed.dlq";
+    public static final String REFUND_SUCCESS_DLQ_ROUTING_KEY = "refund.success.dlq";
 
     @Bean
     public DirectExchange paymentEventExchange() {
@@ -40,13 +45,68 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public DirectExchange paymentDlx() {
+        return new DirectExchange(PAYMENT_DLX);
+    }
+
+    @Bean
+    public Queue paymentSuccessDlq() {
+        return QueueBuilder.durable(PAYMENT_SUCCESS_DLQ).build();
+    }
+
+    @Bean
+    public Queue paymentFailedDlq() {
+        return QueueBuilder.durable(PAYMENT_FAILED_DLQ).build();
+    }
+
+    @Bean
+    public Queue refundSuccessDlq() {
+        return QueueBuilder.durable(REFUND_SUCCESS_DLQ).build();
+    }
+
+    @Bean
+    public Binding bindingPaymentSuccessDlq() {
+        return BindingBuilder.bind(paymentSuccessDlq())
+                .to(paymentDlx())
+                .with(PAYMENT_SUCCESS_DLQ_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding bindingPaymentFailedDlq() {
+        return BindingBuilder.bind(paymentFailedDlq())
+                .to(paymentDlx())
+                .with(PAYMENT_FAILED_DLQ_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding bindingRefundSuccessDlq() {
+        return BindingBuilder.bind(refundSuccessDlq())
+                .to(paymentDlx())
+                .with(REFUND_SUCCESS_DLQ_ROUTING_KEY);
+    }
+
+    @Bean
     public Queue paymentSuccessQueue() {
-        return new Queue(PAYMENT_SUCCESS_QUEUE, true);
+        return QueueBuilder.durable(PAYMENT_SUCCESS_QUEUE)
+                .withArgument("x-dead-letter-exchange", PAYMENT_DLX)
+                .withArgument("x-dead-letter-routing-key", PAYMENT_SUCCESS_DLQ_ROUTING_KEY)
+                .build();
     }
 
     @Bean
     public Queue paymentFailedQueue() {
-        return new Queue(PAYMENT_FAILED_QUEUE, true);
+        return QueueBuilder.durable(PAYMENT_FAILED_QUEUE)
+                .withArgument("x-dead-letter-exchange", PAYMENT_DLX)
+                .withArgument("x-dead-letter-routing-key", PAYMENT_FAILED_DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public Queue refundSuccessQueue() {
+        return QueueBuilder.durable(REFUND_SUCCESS_QUEUE)
+                .withArgument("x-dead-letter-exchange", PAYMENT_DLX)
+                .withArgument("x-dead-letter-routing-key", REFUND_SUCCESS_DLQ_ROUTING_KEY)
+                .build();
     }
 
     @Bean
@@ -64,15 +124,10 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Queue reviewEligibilityRequestQueue() {
-        return new Queue(REVIEW_ELIGIBILITY_REQUEST_QUEUE, true);
-    }
-
-    @Bean
-    public Binding bindReviewEligibilityRequest() {
-        return BindingBuilder.bind(reviewEligibilityRequestQueue())
-                .to(new DirectExchange(REVIEW_ELIGIBILITY_EXCHANGE))
-                .with(REVIEW_ELIGIBILITY_REQUEST_ROUTING_KEY);
+    public Binding bindingRefundSuccess() {
+        return BindingBuilder.bind(refundSuccessQueue())
+                .to(paymentEventExchange())
+                .with(REFUND_SUCCESS_ROUTING_KEY);
     }
 
     @Bean
@@ -87,11 +142,4 @@ public class RabbitMQConfig {
         return rabbitTemplate;
     }
 
-    @Bean
-    public RabbitListenerContainerFactory<?> rabbitListenerContainerFactory(ConnectionFactory connectionFactory, Jackson2JsonMessageConverter jsonMessageConverter) {
-        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(connectionFactory);
-        factory.setMessageConverter(jsonMessageConverter);
-        return factory;
-    }
 }

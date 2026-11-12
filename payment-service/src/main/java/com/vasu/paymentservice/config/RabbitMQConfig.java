@@ -13,6 +13,8 @@ public class RabbitMQConfig {
     public static final String PAYMENT_EVENT_EXCHANGE = "payment.events";
     public static final String PAYMENT_SUCCESS_ROUTING_KEY = "payment.success";
     public static final String PAYMENT_FAILED_ROUTING_KEY = "payment.failed";
+    public static final String REFUND_SUCCESS_ROUTING_KEY = "refund.success";
+    public static final String REFUND_FAILED_ROUTING_KEY = "refund.failed";
 
     @Bean
     public DirectExchange paymentEventExchange() {

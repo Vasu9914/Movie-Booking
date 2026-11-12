@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,25 +18,21 @@ public class BookingEventProcessor {
     private final RabbitTemplate rabbitTemplate;
 
     @RabbitListener(queues = RabbitMQConfig.PAYMENT_SUCCESS_QUEUE)
-    public void handlePaymentSuccess(PaymentEvent paymentEvent) {
-        log.info("Received payment success event for booking: {}", paymentEvent.getBookingReference());
-        try {
-            bookingService.confirmBooking(paymentEvent.getBookingReference());
-            log.info("Booking confirmed: {}", paymentEvent.getBookingReference());
-        } catch (Exception e) {
-            log.error("Failed to confirm booking: {}", paymentEvent.getBookingReference(), e);
-        }
+    public void handlePaymentSuccess(@Payload PaymentEvent paymentEvent) {
+        bookingService.confirmBooking(paymentEvent.getBookingReference());
+        log.info("Booking confirmed: {}", paymentEvent.getBookingReference());
     }
 
     @RabbitListener(queues = RabbitMQConfig.PAYMENT_FAILED_QUEUE)
-    public void handlePaymentFailed(PaymentEvent paymentEvent) {
-        log.info("Received payment failed event for booking: {}", paymentEvent.getBookingReference());
-        try {
-            bookingService.cancelBooking(paymentEvent.getBookingReference());
-            log.info("Booking cancelled due to payment failure: {}", paymentEvent.getBookingReference());
-        } catch (Exception e) {
-            log.error("Failed to cancel booking after payment failure: {}", paymentEvent.getBookingReference(), e);
-        }
+    public void handlePaymentFailed(@Payload PaymentEvent paymentEvent) {
+        bookingService.cancelBookingForConsumer(paymentEvent.getBookingReference(), paymentEvent.getCorrelationId());
+        log.info("Booking cancelled due to payment failure: {}", paymentEvent.getBookingReference());
+    }
+
+    @RabbitListener(queues = RabbitMQConfig.REFUND_SUCCESS_QUEUE)
+    public void handleRefundSuccess(@Payload RefundEvent refundEvent) {
+        bookingService.handleRefund(refundEvent.getBookingReference());
+        log.info("Booking marked as refunded: {}", refundEvent.getBookingReference());
     }
 
     public void publishBookingCancelled(BookingCancelledEvent event) {
@@ -43,6 +40,15 @@ public class BookingEventProcessor {
         rabbitTemplate.convertAndSend(
                 RabbitMQConfig.BOOKING_EVENT_EXCHANGE,
                 RabbitMQConfig.BOOKING_CANCELLED_ROUTING_KEY,
+                event
+        );
+    }
+
+    public void publishBookingRefunded(BookingRefundedEvent event) {
+        log.info("Publishing booking refunded event for booking: {}", event.getBookingReference());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.BOOKING_EVENT_EXCHANGE,
+                RabbitMQConfig.BOOKING_REFUNDED_ROUTING_KEY,
                 event
         );
     }

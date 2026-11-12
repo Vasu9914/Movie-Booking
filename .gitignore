@@ -100,6 +100,17 @@ temp/
 docker-compose.override.yml
 
 # -----------------
+# Build logs
+# -----------------
+build-log.txt
+
+# -----------------
+# Node.js (not needed for Java project)
+# -----------------
+node_modules/
+package-lock.json
+
+# -----------------
 # Coverage
 # -----------------
 coverage/

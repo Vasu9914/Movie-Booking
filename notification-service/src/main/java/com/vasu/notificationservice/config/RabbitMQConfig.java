@@ -19,10 +19,14 @@ public class RabbitMQConfig {
     public static final String BOOKING_EVENT_EXCHANGE = "booking.events";
     public static final String PAYMENT_SUCCESS_QUEUE = "notification.payment.success.queue";
     public static final String PAYMENT_FAILED_QUEUE = "notification.payment.failed.queue";
+    public static final String REFUND_SUCCESS_QUEUE = "notification.refund.success.queue";
     public static final String BOOKING_CANCELLED_QUEUE = "notification.booking.cancelled.queue";
     public static final String PAYMENT_SUCCESS_ROUTING_KEY = "payment.success";
     public static final String PAYMENT_FAILED_ROUTING_KEY = "payment.failed";
+    public static final String REFUND_SUCCESS_ROUTING_KEY = "refund.success";
     public static final String BOOKING_CANCELLED_ROUTING_KEY = "booking.cancelled";
+    public static final String REFUND_FAILED_QUEUE = "notification.refund.failed.queue";
+    public static final String REFUND_FAILED_ROUTING_KEY = "refund.failed";
 
     @Bean
     public DirectExchange paymentEventExchange() {
@@ -45,8 +49,18 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue refundSuccessQueue() {
+        return new Queue(REFUND_SUCCESS_QUEUE, true);
+    }
+
+    @Bean
     public Queue bookingCancelledQueue() {
         return new Queue(BOOKING_CANCELLED_QUEUE, true);
+    }
+
+    @Bean
+    public Queue refundFailedQueue() {
+        return new Queue(REFUND_FAILED_QUEUE, true);
     }
 
     @Bean
@@ -64,10 +78,24 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Binding bindingRefundSuccess() {
+        return BindingBuilder.bind(refundSuccessQueue())
+                .to(paymentEventExchange())
+                .with(REFUND_SUCCESS_ROUTING_KEY);
+    }
+
+    @Bean
     public Binding bindingBookingCancelled() {
         return BindingBuilder.bind(bookingCancelledQueue())
                 .to(bookingEventExchange())
                 .with(BOOKING_CANCELLED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding bindingRefundFailed() {
+        return BindingBuilder.bind(refundFailedQueue())
+                .to(paymentEventExchange())
+                .with(REFUND_FAILED_ROUTING_KEY);
     }
 
     @Bean

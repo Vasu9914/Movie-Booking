@@ -59,7 +59,7 @@ public class UserServiceImpl implements UserService {
             throw new IllegalArgumentException("Account is not active");
         }
 
-        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole());
+        String token = jwtUtil.generateToken(user.getId(), user.getEmail(), user.getRole().name());
         return LoginResponse.builder()
                 .token(token)
                 .email(user.getEmail())
